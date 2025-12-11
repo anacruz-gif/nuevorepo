@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Control - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            min-height: 100vh;
+        }
+        
+        .glass {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        
+        .switch {
+            width: 60px;
+            height: 32px;
+            background: #475569;
+            border-radius: 16px;
+            cursor: pointer;
+            position: relative;
+            transition: 0.3s;
+        }
+        
+        .switch.on {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+        }
+        
+        .switch-knob {
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            transition: 0.3s;
+        }
+        
+        .switch.on .switch-knob {
+            transform: translateX(28px);
+        }
+    </style>
+</head>
+<body class="text-white p-6">
+    
+    <div class="max-w-7xl mx-auto">
+        
+        <!-- Header -->
+        <div class="glass rounded-2xl p-6 mb-6">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                        IoT Control Dashboard
+                    </h1>
+                    <p class="text-slate-400 text-sm mt-1">Sistema de Monitoreo ESP32 con Firebase</p>
+                </div>
+                <div id="connStatus" class="px-4 py-2 rounded-full bg-red-500/20 text-red-400 text-sm font-semibold">
+                    ● Desconectado
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuración Firebase -->
+        <div class="glass rounded-2xl p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <i data-lucide="database" class="w-5 h-5 text-orange-400"></i>
+                <h2 class="text-xl font-bold">Configuración Firebase</h2>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-2">API Key</label>
+                    <input type="text" id="apiKey" placeholder="AIzaSy..."
+                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-2">Database URL</label>
+                    <input type="text" id="dbUrl" placeholder="https://proyecto.firebaseio.com"
+                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="conectar()" 
+                            class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 px-6 py-2 rounded-lg font-semibold transition">
+                        Conectar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Temperatura Global -->
+        <div class="glass rounded-2xl p-8 mb-6">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-purple-400">Temperatura Promedio</h2>
+                    <p class="text-slate-400 text-sm">Promedio de todos los sensores activos</p>
+                </div>
+                <i data-lucide="thermometer" class="w-12 h-12 text-purple-400"></i>
+            </div>
+            <div class="flex items-center gap-8">
+                <div class="flex-1">
+                    <div class="h-32 bg-slate-800 rounded-2xl overflow-hidden relative">
+                        <div id="barraPromedio" class="absolute bottom-0 w-full bg-gradient-to-t from-purple-600 to-pink-500 transition-all duration-700" style="height: 0%"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-500 mt-2">
+                        <span>0°C</span>
+                        <span>50°C</span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div id="tempPromedio" class="text-7xl font-black text-purple-400">--</div>
+                    <div class="text-xl text-slate-400">°C</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sensores de Temperatura -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            
+            <!-- Sensor 1 -->
+            <div class="glass rounded-2xl p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-blue-400">Sensor DS1</h3>
+                        <p class="text-xs text-slate-500">temperaturas/sensor1</p>
+                    </div>
+                    <i data-lucide="thermometer" class="w-6 h-6 text-blue-400"></i>
+                </div>
+                <div id="temp1" class="text-4xl font-black text-blue-400 mb-3">--°C</div>
+                <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="barra1" class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-700" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Sensor 2 -->
+            <div class="glass rounded-2xl p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-green-400">Sensor DS2</h3>
+                        <p class="text-xs text-slate-500">temperaturas/sensor2</p>
+                    </div>
+                    <i data-lucide="thermometer" class="w-6 h-6 text-green-400"></i>
+                </div>
+                <div id="temp2" class="text-4xl font-black text-green-400 mb-3">--°C</div>
+                <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="barra2" class="h-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all duration-700" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Sensor 3 -->
+            <div class="glass rounded-2xl p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-orange-400">Sensor DS3</h3>
+                        <p class="text-xs text-slate-500">temperaturas/sensor3</p>
+                    </div>
+                    <i data-lucide="thermometer" class="w-6 h-6 text-orange-400"></i>
+                </div>
+                <div id="temp3" class="text-4xl font-black text-orange-400 mb-3">--°C</div>
+                <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="barra3" class="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-700" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Sensor 4 -->
+            <div class="glass rounded-2xl p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-red-400">Sensor DS4</h3>
+                        <p class="text-xs text-slate-500">temperaturas/sensor4</p>
+                    </div>
+                    <i data-lucide="thermometer" class="w-6 h-6 text-red-400"></i>
+                </div>
+                <div id="temp4" class="text-4xl font-black text-red-400 mb-3">--°C</div>
+                <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="barra4" class="h-full bg-gradient-to-r from-red-500 to-rose-400 transition-all duration-700" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control de Dispositivos -->
+        <div class="glass rounded-2xl p-6">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <i data-lucide="toggle-left" class="w-6 h-6 text-cyan-400"></i>
+                Control de Dispositivos
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                <!-- Dispositivo 1 -->
+                <div class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold">Sala Principal</h3>
+                            <p class="text-xs text-slate-500">control/sala</p>
+                        </div>
+                        <i data-lucide="lightbulb" id="icon1" class="w-5 h-5 text-slate-500"></i>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span id="estado1" class="text-sm text-slate-400">Apagado</span>
+                        <div class="switch" id="switch1" onclick="cambiar('sala', 1)">
+                            <div class="switch-knob"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dispositivo 2 -->
+                <div class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold">Laboratorio</h3>
+                            <p class="text-xs text-slate-500">control/laboratorio</p>
+                        </div>
+                        <i data-lucide="cpu" id="icon2" class="w-5 h-5 text-slate-500"></i>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span id="estado2" class="text-sm text-slate-400">Apagado</span>
+                        <div class="switch" id="switch2" onclick="cambiar('laboratorio', 2)">
+                            <div class="switch-knob"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dispositivo 3 -->
+                <div class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold">Ventilación</h3>
+                            <p class="text-xs text-slate-500">control/ventilacion</p>
+                        </div>
+                        <i data-lucide="fan" id="icon3" class="w-5 h-5 text-slate-500"></i>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span id="estado3" class="text-sm text-slate-400">Apagado</span>
+                        <div class="switch" id="switch3" onclick="cambiar('ventilacion', 3)">
+                            <div class="switch-knob"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dispositivo 4 -->
+                <div class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold">Sistema</h3>
+                            <p class="text-xs text-slate-500">control/sistema</p>
+                        </div>
+                        <i data-lucide="power" id="icon4" class="w-5 h-5 text-slate-500"></i>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span id="estado4" class="text-sm text-slate-400">Apagado</span>
+                        <div class="switch" id="switch4" onclick="cambiar('sistema', 4)">
+                            <div class="switch-knob"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 text-slate-500 text-sm">
+            <p>IST Vida Nueva - Sistema IoT © 2025</p>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        let db = null;
+
+        window.conectar = function() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const dbUrl = document.getElementById('dbUrl').value.trim();
+            
+            if (!apiKey || !dbUrl) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Campos vacíos',
+                    text: 'Ingresa API Key y Database URL',
+                    background: '#1e293b',
+                    color: '#fff'
+                });
+                return;
+            }
+
+            try {
+                localStorage.setItem('firebase_api', apiKey);
+                localStorage.setItem('firebase_url', dbUrl);
+
+                const app = initializeApp({
+                    apiKey: apiKey,
+                    databaseURL: dbUrl
+                });
+
+                db = getDatabase(app);
+                document.getElementById('connStatus').className = 'px-4 py-2 rounded-full bg-green-500/20 text-green-400 text-sm font-semibold';
+                document.getElementById('connStatus').textContent = '● Conectado';
+
+                // Escuchar temperaturas
+                onValue(ref(db, 'temperaturas'), (snapshot) => {
+                    const data = snapshot.val();
+                    console.log('Datos recibidos:', data);
+                    
+                    if (data) {
+                        const temps = [];
+                        
+                        // Sensor 1
+                        if (data.sensor1 !== undefined && data.sensor1 !== null) {
+                            const t1 = parseFloat(data.sensor1);
+                            document.getElementById('temp1').textContent = t1.toFixed(1) + '°C';
+                            document.getElementById('barra1').style.width = Math.min((t1/50)*100, 100) + '%';
+                            temps.push(t1);
+                        }
+                        
+                        // Sensor 2
+                        if (data.sensor2 !== undefined && data.sensor2 !== null) {
+                            const t2 = parseFloat(data.sensor2);
+                            document.getElementById('temp2').textContent = t2.toFixed(1) + '°C';
+                            document.getElementById('barra2').style.width = Math.min((t2/50)*100, 100) + '%';
+                            temps.push(t2);
+                        }
+                        
+                        // Sensor 3
+                        if (data.sensor3 !== undefined && data.sensor3 !== null) {
+                            const t3 = parseFloat(data.sensor3);
+                            document.getElementById('temp3').textContent = t3.toFixed(1) + '°C';
+                            document.getElementById('barra3').style.width = Math.min((t3/50)*100, 100) + '%';
+                            temps.push(t3);
+                        }
+                        
+                        // Sensor 4
+                        if (data.sensor4 !== undefined && data.sensor4 !== null) {
+                            const t4 = parseFloat(data.sensor4);
+                            document.getElementById('temp4').textContent = t4.toFixed(1) + '°C';
+                            document.getElementById('barra4').style.width = Math.min((t4/50)*100, 100) + '%';
+                            temps.push(t4);
+                        }
+                        
+                        // Calcular promedio
+                        if (temps.length > 0) {
+                            const promedio = temps.reduce((a,b) => a+b, 0) / temps.length;
+                            document.getElementById('tempPromedio').textContent = promedio.toFixed(1);
+                            document.getElementById('barraPromedio').style.height = Math.min((promedio/50)*100, 100) + '%';
+                        }
+                    }
+                });
+
+                // Escuchar controles
+                onValue(ref(db, 'control'), (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        actualizarUI('sala', data.sala, 1);
+                        actualizarUI('laboratorio', data.laboratorio, 2);
+                        actualizarUI('ventilacion', data.ventilacion, 3);
+                        actualizarUI('sistema', data.sistema, 4);
+                    }
+                });
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Conectado',
+                    text: 'Conexión establecida correctamente',
+                    background: '#1e293b',
+                    color: '#fff',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+
+            } catch (error) {
+                console.error('Error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: error.message,
+                    background: '#1e293b',
+                    color: '#fff'
+                });
+            }
+        };
+
+        window.cambiar = function(dispositivo, num) {
+            if (!db) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Sin conexión',
+                    text: 'Conecta Firebase primero',
+                    background: '#1e293b',
+                    color: '#fff'
+                });
+                return;
+            }
+
+            const sw = document.getElementById('switch' + num);
+            const nuevoEstado = !sw.classList.contains('on');
+
+            set(ref(db, 'control/' + dispositivo), nuevoEstado)
+                .then(() => {
+                    if (navigator.vibrate) navigator.vibrate(50);
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: err.message,
+                        background: '#1e293b',
+                        color: '#fff'
+                    });
+                });
+        };
+
+        function actualizarUI(nombre, estado, num) {
+            const sw = document.getElementById('switch' + num);
+            const icon = document.getElementById('icon' + num);
+            const est = document.getElementById('estado' + num);
+
+            if (estado) {
+                sw.classList.add('on');
+                icon.classList.remove('text-slate-500');
+                icon.classList.add('text-yellow-400');
+                est.textContent = 'Encendido';
+                est.classList.remove('text-slate-400');
+                est.classList.add('text-green-400');
+            } else {
+                sw.classList.remove('on');
+                icon.class
